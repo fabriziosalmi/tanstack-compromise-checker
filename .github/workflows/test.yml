@@ -1,0 +1,54 @@
+# Lint check.sh with shellcheck and run the smoke test suite on every push/PR.
+# Catches regressions before they reach the Docker self-test (which is slower
+# because it has to build the image).
+
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run shellcheck
+        # --severity=warning so info-level findings (SC2094 false positives in
+        # the lockfile read loops, SC2329 on guarded helpers) don't fail CI.
+        # Bump to 'info' once the loop-read patterns are refactored.
+        run: shellcheck --severity=warning -x check.sh entrypoint.sh tests/smoke.sh
+
+  smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run smoke tests
+        run: bash tests/smoke.sh

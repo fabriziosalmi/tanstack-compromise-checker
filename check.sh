@@ -193,7 +193,8 @@ json_escape() {
 add_finding() {
   # add_finding <check> <severity> <message> [path] [extra_kv_json_fragment]
   local check="$1" sev="$2" msg="$3" path="${4:-}" extra="${5:-}"
-  local obj="{\"check\":\"$(json_escape "$check")\",\"severity\":\"$sev\",\"message\":\"$(json_escape "$msg")\""
+  local obj
+  obj="{\"check\":\"$(json_escape "$check")\",\"severity\":\"$sev\",\"message\":\"$(json_escape "$msg")\""
   [[ -n "$path" ]] && obj+=",\"path\":\"$(json_escape "$path")\""
   [[ -n "$extra" ]] && obj+=",${extra}"
   obj+="}"

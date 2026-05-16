@@ -272,7 +272,7 @@ your forwarder. Structure:
 ```json
 {
   "version": "1.0.0",
-  "summary": { "passed": N, "warnings": N, "failed": N },
+  "summary": { "passed": 6, "warnings": 0, "failed": 1 },
   "findings": [
     {
       "check": "installed-modules",

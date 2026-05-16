@@ -1,0 +1,8 @@
+{
+  "name": "compromised-project",
+  "version": "0.1.0",
+  "dependencies": {
+    "@tanstack/react-router": "^1.169.5",
+    "react": "^18.3.0"
+  }
+}

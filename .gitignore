@@ -1,0 +1,37 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Findings produced by the tool itself
+findings.json
+tanstack-findings.json
+tanstack-compromise-findings.json
+*.findings.json
+
+# Local scratch
+.scratch/
+tmp/
+*.log
+
+# Dependency / build directories that may appear if someone tests inside the repo
+node_modules/
+dist/
+.next/
+.cache/
+# …but the smoke-test fixtures need a synthetic node_modules to assert detection.
+!tests/fixtures/**/node_modules/
+!tests/fixtures/**/node_modules/**
+
+# Python (for the JSON-parsing fallback)
+__pycache__/
+*.pyc
+
+# Docker
+*.tar.gz

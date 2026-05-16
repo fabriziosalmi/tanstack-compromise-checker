@@ -22,4 +22,12 @@ COPY check.sh /action/check.sh
 COPY entrypoint.sh /action/entrypoint.sh
 RUN chmod +x /action/check.sh /action/entrypoint.sh
 
+# Run as a non-root user. UID 1001 matches the GitHub Actions runner UID that
+# owns $GITHUB_WORKSPACE, so the entrypoint can write findings JSON without
+# ownership gymnastics. For ad-hoc `docker run` on hosts where the bind-mount
+# is owned by a different UID, pass `--user 0` or chmod the mount first.
+RUN addgroup -S tcc -g 1001 && adduser -S -G tcc -u 1001 -h /home/tcc -s /bin/bash tcc \
+    && chown -R 1001:1001 /action
+USER 1001:1001
+
 ENTRYPOINT ["/action/entrypoint.sh"]
