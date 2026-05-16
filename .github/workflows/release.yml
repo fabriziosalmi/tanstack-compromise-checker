@@ -1,0 +1,129 @@
+# Release workflow.
+# Triggered by pushing a tag like v1.0.0. Produces:
+#   1. A GitHub Release containing check.sh + check.sh.sha256 so users can
+#      verify the script before running it.
+#   2. A multi-arch Docker image on ghcr.io/<owner>/tanstack-compromise-checker
+#      tagged with the version and 'latest'. Lets non-bash users run the tool
+#      one-shot: docker run --rm -v "$PWD":/scan ghcr.io/.../checker --scan-dir /scan
+#   3. Build provenance attestations for the image (SLSA, verifiable with
+#      `gh attestation verify`).
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write           # create the GitHub Release
+      packages: write           # push to ghcr.io
+      id-token: write           # OIDC token for attestations
+      attestations: write       # produce SLSA provenance for the image
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Compute checksums
+        id: checksum
+        run: |
+          set -euo pipefail
+          sha256sum check.sh > check.sh.sha256
+          sha256sum action.yml entrypoint.sh Dockerfile >> check.sh.sha256
+          echo "---"
+          cat check.sh.sha256
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/tanstack-compromise-checker"
+          {
+            echo "image=$IMAGE"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+            ${{ steps.meta.outputs.image }}:latest
+
+      - name: Attest image provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-name: ${{ steps.meta.outputs.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          generate_release_notes: true
+          files: |
+            check.sh
+            check.sh.sha256
+          body: |
+            ## tanstack-compromise-checker ${{ github.ref_name }}
+
+            **Verify before running** — this is a security tool, treat it like one.
+
+            ### One-liner (bash, with checksum verification)
+            ```sh
+            TAG=${{ github.ref_name }}
+            curl -fsSLO https://github.com/${{ github.repository }}/releases/download/$TAG/check.sh
+            curl -fsSLO https://github.com/${{ github.repository }}/releases/download/$TAG/check.sh.sha256
+            sha256sum -c check.sh.sha256 && bash check.sh
+            ```
+
+            ### Docker (works on macOS, Linux, Windows)
+            ```sh
+            docker run --rm -v "$PWD":/scan ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }} /scan true fail tanstack-findings.json '' GHSA-g7cv-rxg3-hmpx
+            ```
+
+            ### GitHub Action
+            ```yaml
+            - uses: ${{ github.repository }}@${{ github.ref_name }}
+              with:
+                scan-dir: .
+                online: 'true'
+            ```
+
+            Image provenance is signed; verify with:
+            ```sh
+            gh attestation verify oci://${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }} --repo ${{ github.repository }}
+            ```

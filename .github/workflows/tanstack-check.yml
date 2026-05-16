@@ -1,0 +1,63 @@
+# Self-test: run the locally-defined action against this repo on every push/PR
+# and weekly. Validates that action.yml, the Dockerfile, and check.sh stay
+# consistent end-to-end.
+
+name: TanStack compromise check (self-test)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly Sundays 04:00 UTC. Catches new advisories.
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+
+# Default to zero permissions; each job grants only what it needs.
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          # 'audit' logs unexpected egress without breaking the build. Switch
+          # to 'block' with an explicit allow-list once the surface is stable.
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Do not leave an authenticated git remote in $GITHUB_WORKSPACE
+          # that a Docker action could read.
+          persist-credentials: false
+
+      - name: Run tanstack-compromise-checker
+        id: tanstack
+        uses: ./
+        with:
+          scan-dir: .
+          online: 'true'
+          fail-on: fail
+          json-output: tanstack-findings.json
+
+      - name: Upload findings JSON
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tanstack-compromise-findings
+          path: tanstack-findings.json
+          if-no-files-found: warn
+
+      - name: Summarize
+        if: always()
+        run: |
+          echo "passed:    ${{ steps.tanstack.outputs.passed }}"
+          echo "warnings:  ${{ steps.tanstack.outputs.warnings }}"
+          echo "failed:    ${{ steps.tanstack.outputs.failed }}"
+          echo "exit-code: ${{ steps.tanstack.outputs.exit-code }}"

@@ -1,0 +1,14 @@
+# Critical files require maintainer review for every PR.
+# Order matters: later patterns override earlier ones.
+
+*                       @fabriziosalmi
+
+# Code that runs on a user's machine.
+/check.sh               @fabriziosalmi
+/entrypoint.sh          @fabriziosalmi
+/Dockerfile             @fabriziosalmi
+/action.yml             @fabriziosalmi
+
+# CI / supply-chain posture.
+/.github/               @fabriziosalmi
+/SECURITY.md            @fabriziosalmi

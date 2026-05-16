@@ -1,0 +1,55 @@
+name: 'TanStack Compromise Checker'
+description: 'Detect indicators of the TanStack npm supply chain attack (CVE-2026-45321 / GHSA-g7cv-rxg3-hmpx) in a repository.'
+author: 'Fabrizio Salmi'
+branding:
+  icon: 'shield'
+  color: 'red'
+
+inputs:
+  scan-dir:
+    description: 'Directory to scan (relative to repository root). Defaults to the entire workspace.'
+    required: false
+    default: '.'
+  online:
+    description: 'Enable online verification (advisory fetch + npm registry publish-time check). Set to "true" to enable.'
+    required: false
+    default: 'false'
+  fail-on:
+    description: 'Severity that triggers a non-zero exit: "fail" (default), "warn" (fail also on warnings), or "never".'
+    required: false
+    default: 'fail'
+  json-output:
+    description: 'Path (relative to workspace) to write the findings JSON. Empty = no JSON file.'
+    required: false
+    default: 'tanstack-compromise-findings.json'
+  bad-versions-file:
+    description: 'Optional path to a sibling file listing additional pkg@version entries.'
+    required: false
+    default: ''
+  ghsa-id:
+    description: 'Override the GHSA ID used in --online advisory fetch.'
+    required: false
+    default: 'GHSA-g7cv-rxg3-hmpx'
+
+outputs:
+  passed:
+    description: 'Number of checks that passed.'
+  warnings:
+    description: 'Number of warnings raised.'
+  failed:
+    description: 'Number of failures raised.'
+  exit-code:
+    description: 'Raw exit code of check.sh (0 clean, 1 warn, 2 fail, 3 tool error).'
+  findings-path:
+    description: 'Path to the JSON findings file (if json-output was set).'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.scan-dir }}
+    - ${{ inputs.online }}
+    - ${{ inputs.fail-on }}
+    - ${{ inputs.json-output }}
+    - ${{ inputs.bad-versions-file }}
+    - ${{ inputs.ghsa-id }}
