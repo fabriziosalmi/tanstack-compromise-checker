@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-05-16
+
+### Fixed
+- Check 8 C2-domain and disposable-host grep now excludes documentation
+  files (`*.md`, `*.markdown`, `*.rst`, `*.txt`), the project's own root
+  docs (`CHANGELOG*`, `README*`, `SECURITY*`, `FAQ*`, `CONTRIBUTING*`),
+  and `check.sh` itself. The v1.1.0 self-test failed because the checker
+  was flagging the IOC list inside its own CHANGELOG as a C2 reference.
+
 ## [1.1.0] — 2026-05-16
 
 ### Added
@@ -76,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checkout, `step-security/harden-runner` as the first step, OpenSSF
   Scorecard analysis weekly, Dependabot for github-actions and Docker pins.
 
-[Unreleased]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/fabriziosalmi/tanstack-compromise-checker/releases/tag/v1.0.0

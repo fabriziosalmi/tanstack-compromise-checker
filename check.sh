@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check.sh — TanStack npm supply chain attack checker (v1.1.0)
+# check.sh — TanStack npm supply chain attack checker (v1.1.1)
 # CVE-2026-45321 / GHSA-g7cv-rxg3-hmpx
 # https://github.com/fabriziosalmi/tanstack-compromise-checker
 #
@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 SCAN_DIR="${HOME}"
@@ -1003,8 +1003,15 @@ while IFS= read -r repo_cfg; do
   fi
 done < <(find "$SCAN_DIR" \( -name 'node_modules' -o -name '.git' \) -prune -o \( -path '*/.claude/settings.json' -o -path '*/.claude/mcp.json' -o -path '*/.kiro/settings/mcp.json' -o -path '*/.vscode/tasks.json' \) -type f -print 2>/dev/null || true)
 
-# 8e — C2 domain references in scanned source files (excluding node_modules / .git / dist)
-C2_HIT=$(grep -rEl --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.next --exclude-dir=.cache \
+# 8e — C2 domain references in scanned source files (code/config only).
+# Exclude docs (legitimate IOC mentions in advisories / READMEs) and the
+# checker's own indicator definitions, otherwise we flag ourselves.
+C2_HIT=$(grep -rEl \
+  --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist \
+  --exclude-dir=.next --exclude-dir=.cache --exclude-dir=docs \
+  --exclude='*.md' --exclude='*.markdown' --exclude='*.rst' --exclude='*.txt' \
+  --exclude='check.sh' --exclude='CHANGELOG*' --exclude='README*' \
+  --exclude='SECURITY*' --exclude='FAQ*' --exclude='CONTRIBUTING*' \
   "$C2_DOMAINS_RE" "$SCAN_DIR" 2>/dev/null | head -10 || true)
 if [[ -n "$C2_HIT" ]]; then
   while IFS= read -r line; do
@@ -1078,7 +1085,13 @@ while IFS= read -r line; do
   [[ -z "$line" ]] && continue
   info "Disposable-endpoint host referenced in source: ${BLD}$line${RST} — review whether legitimate"
   add_finding "heuristic-host" "info" "Disposable / ephemeral endpoint host referenced in source" "$line"
-done < <(grep -rEl --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.next --exclude-dir=.cache --exclude-dir=tests \
+done < <(grep -rEl \
+  --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist \
+  --exclude-dir=.next --exclude-dir=.cache --exclude-dir=tests \
+  --exclude-dir=docs \
+  --exclude='*.md' --exclude='*.markdown' --exclude='*.rst' --exclude='*.txt' \
+  --exclude='check.sh' --exclude='CHANGELOG*' --exclude='README*' \
+  --exclude='SECURITY*' --exclude='FAQ*' --exclude='CONTRIBUTING*' \
   "$SUSPICIOUS_HOSTS_RE" "$SCAN_DIR" 2>/dev/null | head -10 || true)
 
 # 8k — npm token descriptions hinting at coercion. Looser than the exact ransom
