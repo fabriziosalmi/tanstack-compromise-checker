@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check.sh — TanStack npm supply chain attack checker (v1.0.0)
+# check.sh — TanStack npm supply chain attack checker (v1.1.0)
 # CVE-2026-45321 / GHSA-g7cv-rxg3-hmpx
 # https://github.com/fabriziosalmi/tanstack-compromise-checker
 #
@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 SCAN_DIR="${HOME}"
@@ -149,7 +149,48 @@ KNOWN_BAD_VERSIONS=(
   "@tanstack/start@1.169.5" "@tanstack/start@1.169.8"
   "@tanstack/react-start@1.169.5" "@tanstack/react-start@1.169.8"
   "@tanstack/solid-start@1.169.5" "@tanstack/solid-start@1.169.8"
+  # Worm-propagated secondary victims (Mini Shai-Hulud).
+  "@mistralai/mistralai@2.2.3" "@mistralai/mistralai@2.2.4"
+  "@mistralai/mistralai-azure@1.7.2" "@mistralai/mistralai-azure@1.7.3"
+  "@mistralai/mistralai-gcp@1.7.2" "@mistralai/mistralai-gcp@1.7.3"
+  "@opensearch-project/opensearch@3.6.2"
+  "@draftlab/auth@0.24.1" "@draftlab/auth@0.24.2"
+  "@draftlab/auth-router@0.5.1" "@draftlab/auth-router@0.5.2"
+  "@draftlab/db@0.16.1" "@draftlab/db@0.16.2"
+  "safe-action@0.8.3" "safe-action@0.8.4"
 )
+
+# Secondary worm-propagated packages — used by Check 8 for name-based detection
+# without anchoring to a specific version.
+SECONDARY_VICTIM_FAMILIES=(
+  "@mistralai/mistralai"
+  "@mistralai/mistralai-azure"
+  "@mistralai/mistralai-gcp"
+  "@opensearch-project/opensearch"
+  "@draftlab/auth"
+  "@draftlab/auth-router"
+  "@draftlab/db"
+  "safe-action"
+)
+
+# Known C2 / exfiltration endpoints used by the payload.
+C2_DOMAINS_RE='api\.masscan\.cloud|git-tanstack\.com|getsession\.org|litter\.catbox\.moe'
+
+# Files dropped on disk by the payload.
+PAYLOAD_FILES=("router_init.js" "tanstack_runner.js" "router_runtime.js")
+
+# Attacker commit author identity seen in the wild.
+ATTACKER_AUTHOR="claude@users.noreply.github.com"
+
+# Suspicious branch patterns. The 'dependabout' typo is the actual attacker
+# fingerprint, not the legitimate 'dependabot'.
+SUSPICIOUS_BRANCH_PATTERNS=(
+  "dependabot/github_actions/format/"
+  "dependabout/"
+)
+
+# Ransom token marker left by the attacker in npm token descriptions.
+RANSOM_TOKEN_RE="IfYouRevokeThisTokenItWillWipeTheComputerOfTheOwner"
 
 if [[ -n "$EXTRA_BAD_FILE" ]]; then
   if [[ ! -r "$EXTRA_BAD_FILE" ]]; then
@@ -372,7 +413,7 @@ if $ONLINE_CHECK; then
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-hdr "1 / 7  DEAD-MAN'S SWITCH ARTEFACTS"
+hdr "1 / 8  DEAD-MAN'S SWITCH ARTEFACTS"
 # ══════════════════════════════════════════════════════════════════════════════
 
 DMS_FILES=(
@@ -431,7 +472,7 @@ if ! $DMS_FOUND; then
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-hdr "2 / 7  PERSISTENCE VECTORS"
+hdr "2 / 8  PERSISTENCE VECTORS"
 # ══════════════════════════════════════════════════════════════════════════════
 
 PERSIST_FOUND=false
@@ -492,7 +533,7 @@ if ! $PERSIST_FOUND; then
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-hdr "3 / 7  TOKEN / CREDENTIAL EXPOSURE"
+hdr "3 / 8  TOKEN / CREDENTIAL EXPOSURE"
 # ══════════════════════════════════════════════════════════════════════════════
 
 CRED_EXPOSED=false
@@ -553,7 +594,7 @@ if ! $CRED_EXPOSED; then
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-hdr "4 / 7  NETWORK INDICATORS"
+hdr "4 / 8  NETWORK INDICATORS"
 # ══════════════════════════════════════════════════════════════════════════════
 
 NET_INFO=false
@@ -578,7 +619,7 @@ fi
 $NET_INFO || ok "No node TCP connections currently established (or none observable)"
 
 # ══════════════════════════════════════════════════════════════════════════════
-hdr "5 / 7  REPO SCAN — package.json + lockfiles"
+hdr "5 / 8  REPO SCAN — package.json + lockfiles"
 # ══════════════════════════════════════════════════════════════════════════════
 
 info "Indexing manifests under ${SCAN_DIR} (pruning node_modules, .git, dist, etc.)…"
@@ -756,7 +797,7 @@ done < <(grep -E '/(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$' "$MANIFEST_
 $LOCK_HITS || ok "No compromised pins found in any lockfile"
 
 # ══════════════════════════════════════════════════════════════════════════════
-hdr "6 / 7  INSTALLED node_modules — direct version check"
+hdr "6 / 8  INSTALLED node_modules — direct version check"
 # ══════════════════════════════════════════════════════════════════════════════
 
 INSTALLED_HITS=false
@@ -826,12 +867,37 @@ except Exception:
     fi
     INSTALLED_HITS=true
   fi
-done < <(find "$SCAN_DIR" -path '*/node_modules/@tanstack/*/package.json' -type f 2>/dev/null || true)
+done < <(find "$SCAN_DIR" \
+    \( -path '*/tests/fixtures/*' -o -path '*/template/*' -o -path '*/templates/*' \
+       -o -path '*/__tests__/*' -o -path '*/__fixtures__/*' \) -prune \
+    -o -path '*/node_modules/@tanstack/*/package.json' -type f -print 2>/dev/null || true)
+
+# Secondary worm-propagated victims — name-only match because version may drift.
+for fam in "${SECONDARY_VICTIM_FAMILIES[@]}"; do
+  while IFS= read -r p; do
+    [[ -z "$p" ]] && continue
+    case "$p" in *"/node_modules/${fam}/package.json") ;; *) continue ;; esac
+    # Skip test fixtures
+    case "$p" in *"/tests/fixtures/"*) continue ;; esac
+    ver=$(grep -m1 '"version"[[:space:]]*:' "$p" 2>/dev/null | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' || true)
+    if is_known_bad "$fam" "$ver"; then
+      fail "INSTALLED MALICIOUS (worm-secondary): ${BLD}${fam}@${ver}${RST} at ${p%/package.json}"
+      add_finding "installed" "fail" "Worm-secondary victim @ known-bad version" "$p" "\"package\":\"$(json_escape "$fam")\",\"version\":\"$(json_escape "$ver")\""
+      INSTALLED_HITS=true
+    else
+      info "Worm-secondary family installed: ${fam}@${ver} (verify against advisory) at ${p%/package.json}"
+      add_finding "installed" "info" "Worm-secondary family present (version not in known-bad list)" "$p" "\"package\":\"$(json_escape "$fam")\",\"version\":\"$(json_escape "$ver")\""
+    fi
+  done < <(find "$SCAN_DIR" \
+      \( -path '*/tests/fixtures/*' -o -path '*/template/*' -o -path '*/templates/*' \
+         -o -path '*/__tests__/*' -o -path '*/__fixtures__/*' \) -prune \
+      -o -path "*/node_modules/${fam}/package.json" -type f -print 2>/dev/null || true)
+done
 
 $INSTALLED_HITS || ok "No compromised packages in installed node_modules"
 
 # ══════════════════════════════════════════════════════════════════════════════
-hdr "7 / 7  GITHUB ACTIONS HARDENING HINTS"
+hdr "7 / 8  GITHUB ACTIONS HARDENING HINTS"
 # ══════════════════════════════════════════════════════════════════════════════
 
 WF_FOUND=false
@@ -857,6 +923,186 @@ while IFS= read -r wf; do
 done < <(find "$SCAN_DIR" -path '*/.github/workflows/*' -type f \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null || true)
 
 $WF_FOUND || ok "No risky GitHub Actions patterns detected (in scanned scope)"
+
+# ══════════════════════════════════════════════════════════════════════════════
+hdr "8 / 8  MINI SHAI-HULUD PAYLOAD + AUXILIARY IOCs"
+# ══════════════════════════════════════════════════════════════════════════════
+# Covers the indicators specific to the Mini Shai-Hulud variant that
+# propagated through the TanStack compromise: payload files in node_modules,
+# the @tanstack/setup infection vector, C2 domain references, AI-tool config
+# tampering, ransom-marked npm tokens, attacker git author/branch fingerprints.
+# Source attribution: many of these IOCs are cross-checked with the
+# ry-allan/tanstack-compromise-checker advisory.
+
+CHECK8_HITS=0
+ch8_fail() { fail "$@"; CHECK8_HITS=$((CHECK8_HITS+1)); }
+ch8_warn() { warn "$@"; CHECK8_HITS=$((CHECK8_HITS+1)); }
+
+# 8a — Payload files in node_modules
+PAYLOAD_FIND_EXPR=()
+for f in "${PAYLOAD_FILES[@]}"; do
+  PAYLOAD_FIND_EXPR+=( -name "$f" -o )
+done
+unset 'PAYLOAD_FIND_EXPR[${#PAYLOAD_FIND_EXPR[@]}-1]'   # drop trailing -o
+while IFS= read -r payload; do
+  [[ -z "$payload" ]] && continue
+  ch8_fail "Payload file in node_modules: ${BLD}$payload${RST}"
+  add_finding "payload-file" "fail" "Mini Shai-Hulud payload file in node_modules" "$payload"
+done < <(find "$SCAN_DIR" \
+    \( -path '*/tests/fixtures/*' -o -path '*/__tests__/*' -o -path '*/__fixtures__/*' \) -prune \
+    -o -path '*/node_modules/*' -type f \( "${PAYLOAD_FIND_EXPR[@]}" \) -print 2>/dev/null || true)
+
+# 8b — @tanstack/setup as optionalDependency (primary infection vector)
+while IFS= read -r pkgjson; do
+  [[ -z "$pkgjson" ]] && continue
+  if grep -q '"@tanstack/setup"' "$pkgjson" 2>/dev/null; then
+    ch8_fail "@tanstack/setup optionalDependency referenced in: ${BLD}$pkgjson${RST}"
+    add_finding "infection-vector" "fail" "@tanstack/setup optionalDependency" "$pkgjson"
+  fi
+done < <(find "$SCAN_DIR" -path '*/node_modules/*' -name package.json -type f 2>/dev/null || true)
+
+# 8c — Payload-dropped files on host and inside scanned repos
+PAYLOAD_HOST_PATHS=(
+  "$HOME/.claude/router_runtime.js"
+  "$HOME/.claude/setup.mjs"
+  "$HOME/.vscode/setup.mjs"
+  "$HOME/.config/gh-token-monitor/token"
+)
+for p in "${PAYLOAD_HOST_PATHS[@]}"; do
+  if [[ -e "$p" ]]; then
+    ch8_fail "Payload artefact on host: ${BLD}$p${RST}"
+    add_finding "payload-host" "fail" "Mini Shai-Hulud payload artefact on host" "$p"
+  fi
+done
+PAYLOAD_REPO_PATHS=(".claude/router_runtime.js" ".claude/setup.mjs" ".vscode/setup.mjs")
+for rel in "${PAYLOAD_REPO_PATHS[@]}"; do
+  while IFS= read -r hit; do
+    [[ -z "$hit" ]] && continue
+    ch8_fail "Payload artefact in repo: ${BLD}$hit${RST}"
+    add_finding "payload-repo" "fail" "Mini Shai-Hulud payload artefact in repo" "$hit"
+  done < <(find "$SCAN_DIR" -path "*/$rel" -type f 2>/dev/null || true)
+done
+
+# 8d — AI-tool config tampering (Claude Code SessionStart, VSCode tasks, MCP config)
+AI_CONFIG_PATHS=(
+  "$HOME/.claude/settings.json"
+  "$HOME/.claude/mcp.json"
+  "$HOME/.kiro/settings/mcp.json"
+)
+for cfg in "${AI_CONFIG_PATHS[@]}"; do
+  if [[ -f "$cfg" ]] && grep -qE 'router_runtime|tanstack_runner|setup\.mjs|router_init|masscan\.cloud|git-tanstack\.com|getsession\.org' "$cfg" 2>/dev/null; then
+    ch8_fail "AI-tool config references payload string: ${BLD}$cfg${RST}"
+    add_finding "ai-config-tamper" "fail" "AI-tool config references payload" "$cfg"
+  fi
+done
+while IFS= read -r repo_cfg; do
+  [[ -z "$repo_cfg" ]] && continue
+  if grep -qE 'router_runtime|tanstack_runner|setup\.mjs|router_init' "$repo_cfg" 2>/dev/null; then
+    ch8_fail "Repo AI-tool config references payload string: ${BLD}$repo_cfg${RST}"
+    add_finding "ai-config-tamper" "fail" "Repo AI-tool config references payload" "$repo_cfg"
+  fi
+done < <(find "$SCAN_DIR" \( -name 'node_modules' -o -name '.git' \) -prune -o \( -path '*/.claude/settings.json' -o -path '*/.claude/mcp.json' -o -path '*/.kiro/settings/mcp.json' -o -path '*/.vscode/tasks.json' \) -type f -print 2>/dev/null || true)
+
+# 8e — C2 domain references in scanned source files (excluding node_modules / .git / dist)
+C2_HIT=$(grep -rEl --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.next --exclude-dir=.cache \
+  "$C2_DOMAINS_RE" "$SCAN_DIR" 2>/dev/null | head -10 || true)
+if [[ -n "$C2_HIT" ]]; then
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    ch8_fail "C2 domain reference in source: ${BLD}$line${RST}"
+    add_finding "c2-domain" "fail" "C2 / exfiltration domain reference in source" "$line"
+  done <<<"$C2_HIT"
+fi
+
+# 8f — Attacker git author and branch patterns (scoped to repos under SCAN_DIR)
+if has git; then
+  while IFS= read -r gitdir; do
+    [[ -z "$gitdir" ]] && continue
+    repo="${gitdir%/.git}"
+    # Attacker author
+    if git -C "$repo" log --all --author="$ATTACKER_AUTHOR" --oneline -n 1 2>/dev/null | grep -q .; then
+      ch8_fail "Git history contains commits by $ATTACKER_AUTHOR in ${BLD}$repo${RST}"
+      add_finding "git-author" "fail" "Commit by attacker author $ATTACKER_AUTHOR" "$repo"
+    fi
+    # Branch patterns
+    branches=$(git -C "$repo" for-each-ref --format='%(refname:short)' refs/heads refs/remotes 2>/dev/null || true)
+    for pat in "${SUSPICIOUS_BRANCH_PATTERNS[@]}"; do
+      if echo "$branches" | grep -q -- "$pat"; then
+        ch8_fail "Suspicious branch pattern '$pat' in ${BLD}$repo${RST}"
+        add_finding "git-branch" "fail" "Suspicious branch pattern: $pat" "$repo"
+      fi
+    done
+  done < <(find "$SCAN_DIR" -name .git -type d -prune 2>/dev/null || true)
+fi
+
+# 8g — npm token ransom-marker
+if has npm; then
+  if npm token list 2>/dev/null | grep -qE "$RANSOM_TOKEN_RE"; then
+    ch8_fail "npm token list contains ransom-marker token — DO NOT REVOKE until host is imaged."
+    add_finding "npm-ransom-token" "fail" "Ransom-marked npm token detected" ""
+  fi
+fi
+
+# 8h — Active payload processes
+if pgrep -f 'router_init\.js|tanstack_runner\.js|router_runtime\.js' >/dev/null 2>&1; then
+  ch8_fail "Active payload process detected (router_init / tanstack_runner / router_runtime)"
+  add_finding "payload-process" "fail" "Active Mini Shai-Hulud payload process" ""
+fi
+
+# ── Heuristics: zero-day-style intelligent flagging ──────────────────────────
+# These are deliberately INFO severity. They do not trigger --fail-on=fail and
+# do not change the exit code. The intent is to surface unknowns so a human can
+# triage them, without turning the tool into a false-positive generator. Every
+# finding emitted here describes *why* it is suspicious so a reader can decide.
+
+# 8i — Suspicious-but-not-known payload-shaped filenames inside node_modules.
+# We flag files matching <something>_runtime.js / <something>_init.js / setup.mjs
+# that are NOT the exact filenames we already match in 8a. New campaigns often
+# reuse this naming scheme.
+while IFS= read -r f; do
+  [[ -z "$f" ]] && continue
+  base="${f##*/}"
+  # Skip the exact known names — those were already caught by 8a as 'fail'.
+  case "$base" in router_init.js|tanstack_runner.js|router_runtime.js) continue ;; esac
+  info "Suspicious filename pattern in node_modules: ${BLD}$f${RST} — manual review"
+  add_finding "heuristic-filename" "info" "Filename matches Mini Shai-Hulud payload-naming pattern (not in known-bad list)" "$f"
+done < <(find "$SCAN_DIR" \
+    \( -path '*/tests/fixtures/*' -o -path '*/__tests__/*' -o -path '*/__fixtures__/*' \) -prune \
+    -o -path '*/node_modules/*' -type f \( -name '*_runtime.js' -o -name '*_init.js' -o -name 'setup.mjs' \) -print 2>/dev/null || true)
+
+# 8j — Webhook-shaped exfiltration hosts in scanned source. These domains are
+# legitimate (webhook.site, ngrok, etc.) but their presence in a project's
+# source is unusual and consistent with C2-by-disposable-endpoint.
+SUSPICIOUS_HOSTS_RE='webhook\.site|requestbin\.net|ngrok\.io|ngrok-free\.app|pipedream\.net|smee\.io|interactsh\.com'
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  info "Disposable-endpoint host referenced in source: ${BLD}$line${RST} — review whether legitimate"
+  add_finding "heuristic-host" "info" "Disposable / ephemeral endpoint host referenced in source" "$line"
+done < <(grep -rEl --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=.next --exclude-dir=.cache --exclude-dir=tests \
+  "$SUSPICIOUS_HOSTS_RE" "$SCAN_DIR" 2>/dev/null | head -10 || true)
+
+# 8k — npm token descriptions hinting at coercion. Looser than the exact ransom
+# regex on 8g; catches paraphrased versions of the same threat.
+if has npm; then
+  if npm token list 2>/dev/null | grep -qiE '(do[[:space:]]*not[[:space:]]*revoke|will[[:space:]]*wipe|ransom|destroy[[:space:]]*data)'; then
+    warn "npm token with coercion-shaped description detected — DO NOT REVOKE yet, image host first"
+    add_finding "heuristic-npm-token" "warn" "npm token description matches coercion language" ""
+  fi
+fi
+
+# 8l — Globally-installed git hooks. The advisory's payload sometimes installs
+# a global pre-commit hook that re-injects itself into every project the victim
+# touches. We can't tell whether the hook is malicious, but flagging an
+# unexpected core.hooksPath is cheap context.
+if has git; then
+  global_hooks="$(git config --global --get core.hooksPath 2>/dev/null || true)"
+  if [[ -n "$global_hooks" ]]; then
+    info "Global git core.hooksPath is set to: ${BLD}$global_hooks${RST} — verify it is yours"
+    add_finding "heuristic-git-hooks" "info" "Global git core.hooksPath is non-empty" "$global_hooks"
+  fi
+fi
+
+[[ "$CHECK8_HITS" -eq 0 ]] && ok "No Mini Shai-Hulud payload / auxiliary IOCs detected"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FIX MODE — print recommendations (and optionally apply with --apply --yes)

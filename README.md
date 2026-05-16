@@ -79,6 +79,7 @@ and is the same workflow this repository runs against itself.
 | 5 | Repo scan | `package.json` declared deps + lockfile pinned versions (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) |
 | 6 | Installed | `node_modules/@tanstack/*/package.json` checked against the known-malicious version list, then against the npm registry `time[<version>]` when `--online` |
 | 7 | Actions hints | `.github/workflows/*` scanned for `pull_request_target`, missing `--ignore-scripts`, `actions/cache` usage |
+| 8 | Mini Shai-Hulud IOCs | payload files in `node_modules` (`router_init.js`, `tanstack_runner.js`), `@tanstack/setup` optionalDependency, AI-tool config tampering, C2 domains in source, attacker commit author + branch patterns, ransom-marked npm tokens, secondary worm-propagated packages, plus info-level heuristics for unknown payload shapes |
 
 With `--online`, the script also fetches the GHSA advisory at runtime so that
 detection coverage tracks the advisory's live state instead of a hard-coded
@@ -168,31 +169,34 @@ download, verify checksum, inspect, then run.
 ## Sample output
 
 ```
-━━  1 / 7  DEAD-MAN'S SWITCH ARTEFACTS
+━━  1 / 8  DEAD-MAN'S SWITCH ARTEFACTS
   ✔  No dead-man's switch artefacts found
 
-━━  2 / 7  PERSISTENCE VECTORS
+━━  2 / 8  PERSISTENCE VECTORS
   ✔  No persistence vectors detected
 
-━━  3 / 7  TOKEN / CREDENTIAL EXPOSURE
+━━  3 / 8  TOKEN / CREDENTIAL EXPOSURE
   ✔  No credential exposure detected
 
-━━  4 / 7  NETWORK INDICATORS
+━━  4 / 8  NETWORK INDICATORS
   ✔  No node TCP connections currently established (or none observable)
 
-━━  5 / 7  REPO SCAN — package.json + lockfiles
+━━  5 / 8  REPO SCAN — package.json + lockfiles
   ℹ  Found 12 package.json + 8 lockfile(s)
   ✔  No compromised family declared in any package.json
   ✔  No compromised pins found in any lockfile
 
-━━  6 / 7  INSTALLED node_modules — direct version check
+━━  6 / 8  INSTALLED node_modules — direct version check
   ✔  No compromised packages in installed node_modules
 
-━━  7 / 7  GITHUB ACTIONS HARDENING HINTS
+━━  7 / 8  GITHUB ACTIONS HARDENING HINTS
   ✔  No risky GitHub Actions patterns detected (in scanned scope)
 
+━━  8 / 8  MINI SHAI-HULUD PAYLOAD + AUXILIARY IOCs
+  ✔  No Mini Shai-Hulud payload / auxiliary IOCs detected
+
 ━━  SUMMARY
-  Passed: 7    Warnings: 0    Failed: 0
+  Passed: 8    Warnings: 0    Failed: 0
   Scope : /Users/alice/dev
   ✔  No indicators of compromise within scope: /Users/alice/dev
   Note: a clean result for /Users/alice/dev does not certify the rest of the system.

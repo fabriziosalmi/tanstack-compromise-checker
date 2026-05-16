@@ -10,7 +10,14 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 SCRIPT="$ROOT/check.sh"
 TMPHOME="$(mktemp -d -t tcc-smoke-home.XXXXXX)"
-trap 'rm -rf "$TMPHOME"' EXIT
+# Copy the fixtures out of tests/fixtures/ so the path the script sees does
+# not contain 'tests/fixtures/' — check.sh prunes that pattern by design so
+# the self-test workflow does not flag the deliberately-compromised fixture.
+TMPSCAN="$(mktemp -d -t tcc-smoke-scan.XXXXXX)"
+# Copy fixtures into a path that does NOT contain any of check.sh's prune
+# patterns (tests/fixtures, fixtures, templates, __tests__, __fixtures__).
+cp -R "$HERE/fixtures" "$TMPSCAN/scenarios"
+trap 'rm -rf "$TMPHOME" "$TMPSCAN"' EXIT
 
 PASS=0
 FAIL=0
@@ -72,11 +79,11 @@ run_exit_code() {
 echo "smoke tests for check.sh"
 echo ""
 
-run_no_failures   "clean fixture: no failures"        "$HERE/fixtures/clean-project"
-run_some_failures "compromised fixture: >=1 failure"  "$HERE/fixtures/compromised-project"
+run_no_failures   "clean fixture: no failures"        "$TMPSCAN/scenarios/clean-project"
+run_some_failures "compromised fixture: >=1 failure"  "$TMPSCAN/scenarios/compromised-project"
 run_exit_code     "unknown flag exits 3"              3 --nope
 run_exit_code     "--help exits 0"                    0 --help
-run_exit_code     "compromised fixture exits 2"       2 --scan-dir "$HERE/fixtures/compromised-project" --no-color --quiet
+run_exit_code     "compromised fixture exits 2"       2 --scan-dir "$TMPSCAN/scenarios/compromised-project" --no-color --quiet
 
 echo ""
 echo "  passed: $PASS"
