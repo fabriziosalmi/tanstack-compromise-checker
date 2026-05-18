@@ -1,0 +1,75 @@
+name: Bug report
+description: Reproducible defect in check.sh, the GitHub Action, or the Docker image.
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please fill every field — this is a security tool and the report content is part of the audit trail.
+
+        **Do not paste sensitive output** (real credentials, real C2 hits, real production paths). Redact before submitting.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `bash check.sh --help | head -1` or the Docker image tag you used.
+      placeholder: "v1.2.0  /  ghcr.io/fabriziosalmi/tanstack-compromise-checker:v1.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: entrypoint
+    attributes:
+      label: How did you run it?
+      options:
+        - "bash check.sh on macOS"
+        - "bash check.sh on Linux"
+        - "bash check.sh on WSL2 / Git Bash"
+        - "Docker image (docker run …)"
+        - "GitHub Action (uses: fabriziosalmi/tanstack-compromise-checker@…)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: invocation
+    attributes:
+      label: Exact command + flags
+      description: Paste the full command line you used.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual output (redacted)
+      description: Paste the relevant section of the script output, JSON, or workflow log. Redact paths and any token-shaped strings.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproducer
+      description: A clean fixture that triggers the issue. NOT a link to a third-party repo (read SECURITY.md § "Recognising follow-on social-engineering attempts" for why). Paste the file tree inline.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmations
+      options:
+        - label: I have searched existing issues and discussions before opening this.
+          required: true
+        - label: The reproducer I provided is content I can publish under MIT (no proprietary code).
+          required: true

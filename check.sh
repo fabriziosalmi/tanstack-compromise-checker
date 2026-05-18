@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check.sh — TanStack npm supply chain attack checker (v1.1.2)
+# check.sh — TanStack npm supply chain attack checker (v1.2.0)
 # CVE-2026-45321 / GHSA-g7cv-rxg3-hmpx
 # https://github.com/fabriziosalmi/tanstack-compromise-checker
 #
@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-VERSION="1.1.2"
+VERSION="1.2.0"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 SCAN_DIR="${HOME}"
@@ -67,9 +67,55 @@ Exit codes:
   2  Failures (compromise indicators present)
   3  Tool/usage error
 
+Integrity:
+  --verify-self          Fetch the SHA-256 manifest from the matching release
+                          on GitHub, compare against this script's own hash,
+                          and exit 0 if they match (otherwise non-zero).
+                          Requires curl + network.
+
 Security note:
   Verify the SHA-256 of this script before piping to bash. See README.
 EOF
+}
+
+verify_self() {
+  # Compare this script's own SHA-256 against the manifest from the matching
+  # GitHub Release. Returns 0 on match, 4 on mismatch, 5 on network/parse fail.
+  local self="${BASH_SOURCE[0]}"
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "Error: --verify-self requires curl" >&2; return 5
+  fi
+  local hash
+  if command -v shasum >/dev/null 2>&1; then
+    hash="$(shasum -a 256 "$self" 2>/dev/null | awk '{print $1}')"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    hash="$(sha256sum "$self" 2>/dev/null | awk '{print $1}')"
+  else
+    echo "Error: no SHA-256 hasher available (need shasum or sha256sum)" >&2; return 5
+  fi
+  [[ -z "$hash" ]] && { echo "Error: could not compute local hash" >&2; return 5; }
+
+  local manifest_url="https://github.com/fabriziosalmi/tanstack-compromise-checker/releases/download/v${VERSION}/check.sh.sha256"
+  local manifest
+  if ! manifest="$(curl -fsSL --max-time 15 "$manifest_url" 2>/dev/null)"; then
+    echo "Error: could not fetch $manifest_url (network or version $VERSION not released)" >&2; return 5
+  fi
+  local expected
+  expected="$(printf '%s\n' "$manifest" | awk '$2 ~ /(^|\/)check\.sh$/ {print $1; exit}')"
+  if [[ -z "$expected" ]]; then
+    echo "Error: manifest at $manifest_url does not contain a check.sh entry" >&2; return 5
+  fi
+  echo "version : $VERSION"
+  echo "local   : $hash"
+  echo "expected: $expected"
+  if [[ "$hash" == "$expected" ]]; then
+    echo "OK — this script matches the v${VERSION} release manifest."
+    return 0
+  else
+    echo "MISMATCH — this script does NOT match the v${VERSION} release manifest." >&2
+    echo "The local copy may have been tampered with. Re-download from the official Release page." >&2
+    return 4
+  fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -96,6 +142,7 @@ while [[ $# -gt 0 ]]; do
     --attack-window-end)
       [[ $# -lt 2 ]] && { echo "Error: --attack-window-end requires an argument" >&2; exit 3; }
       ATTACK_WINDOW_END="$2"; shift 2 ;;
+    --verify-self)       verify_self; exit $? ;;
     -h|--help)           print_help; exit 0 ;;
     *) echo "Unknown option: $1" >&2; echo "Run with -h for help." >&2; exit 3 ;;
   esac

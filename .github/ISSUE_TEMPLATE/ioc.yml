@@ -1,0 +1,68 @@
+name: New IOC request
+description: Propose adding a new indicator (package version, payload file, C2 domain, etc.) to check.sh.
+labels: [ioc, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for IOCs you would like added to the detector. Please cite a public source — IOCs received via email or DM are not actioned (see SECURITY.md).
+
+  - type: textarea
+    id: ioc
+    attributes:
+      label: The indicator
+      description: Be specific. Package name + version range, exact filename + path, domain, IP, commit SHA, etc.
+      placeholder: "@example/pkg @ 1.2.3, 1.2.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: IOC class
+      options:
+        - "Compromised package version (Check 5/6)"
+        - "Payload file in node_modules (Check 8a)"
+        - "Persistence file on host or repo (Check 1/8c)"
+        - "C2 / exfiltration domain or IP (Check 8e)"
+        - "Attacker git author / branch pattern (Check 8f)"
+        - "AI-tool config tampering signature (Check 8d)"
+        - "GitHub Actions hardening hint (Check 7)"
+        - "Other (explain below)"
+    validations:
+      required: true
+
+  - type: input
+    id: source
+    attributes:
+      label: Public source URL
+      description: Advisory, postmortem, vendor blog, peer detector with permissive license. Required.
+      placeholder: "https://github.com/advisories/GHSA-..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why this is high-confidence
+      description: What evidence in the source confirms this IOC? Hash match, regex from the payload, attacker self-disclosure, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: false-positive-risk
+    attributes:
+      label: False-positive risk
+      description: Is this IOC distinct enough that a legitimate project would not match? If not, suggest a severity downgrade to `warn` or `info`.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmations
+      options:
+        - label: The source URL above is publicly accessible and not behind a paywall / signup wall.
+          required: true
+        - label: I am not recommending integration of a third-party repository in bulk — just this specific IOC.
+          required: true

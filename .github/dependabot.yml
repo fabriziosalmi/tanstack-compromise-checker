@@ -7,7 +7,7 @@ updates:
       day: monday
       time: '06:00'
       timezone: Etc/UTC
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     labels:
       - dependencies
       - github-actions
@@ -22,7 +22,7 @@ updates:
       day: monday
       time: '06:00'
       timezone: Etc/UTC
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     labels:
       - dependencies
       - docker

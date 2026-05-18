@@ -35,6 +35,55 @@ jobs:
         # Bump to 'info' once the loop-read patterns are refactored.
         run: shellcheck --severity=warning -x check.sh entrypoint.sh tests/smoke.sh
 
+  trojan-source:
+    # Trojan-Source attack vector defence (CVE-2021-42574): refuse to land
+    # files that contain bidi / zero-width / BOM characters in
+    # security-critical paths. These chars can hide malicious code by making
+    # rendered text differ from the bytes git stores.
+    # Reference: https://trojansource.codes/
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Scan for bidi / zero-width / BOM characters
+        run: |
+          set -euo pipefail
+          # Trojan-Source codepoints, written as PCRE hex escapes so this
+          # workflow file itself stays pure ASCII and does not self-trigger:
+          #   U+202A..U+202E  bidi overrides
+          #   U+2066..U+2069  bidi isolates
+          #   U+200B..U+200F  zero-width + LRM/RLM
+          #   U+FEFF          BOM
+          BIDI_RE='[\x{202A}-\x{202E}\x{2066}-\x{2069}\x{200B}-\x{200F}\x{FEFF}]'
+          FILES="check.sh entrypoint.sh action.yml Dockerfile tests/smoke.sh"
+          # Add every workflow file too.
+          for wf in .github/workflows/*.yml .github/workflows/*.yaml; do
+            [[ -f "$wf" ]] && FILES="$FILES $wf"
+          done
+          fail=0
+          for f in $FILES; do
+            [[ -f "$f" ]] || continue
+            if LC_ALL=C.UTF-8 grep -nP "$BIDI_RE" "$f" 2>/dev/null; then
+              echo "::error file=$f::Trojan-Source character detected"
+              fail=1
+            fi
+          done
+          if [[ $fail -eq 1 ]]; then
+            echo "Hidden bidi / zero-width / BOM characters are not allowed in security-critical files."
+            exit 1
+          fi
+          echo "OK — no Trojan-Source characters in security-critical files."
+
   smoke:
     runs-on: ubuntu-latest
     permissions:

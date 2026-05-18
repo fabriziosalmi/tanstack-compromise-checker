@@ -52,12 +52,40 @@ fail on `main` before your change and pass after.
   scanned filesystem unless `--apply` is explicitly passed and the script
   refuses blind destructive operations.
 - **Severity discipline.** `warn` is for "might be a real problem,
-  needs eyes"; `fail` is for "we are confident this is compromise".
-  Reach for `warn` more often than `fail`.
+  needs eyes"; `fail` is for "we are confident this is compromise";
+  `info` is for heuristic / context-only signals that must never fail
+  the build. Reach for `warn` or `info` more often than `fail`.
 - **Run `shellcheck check.sh`** before committing. The CI does it too.
 - **Tag pins.** Any `uses:` in a workflow must be pinned to a 40-character
   commit SHA, with the human-readable version in a trailing comment
   (e.g. `# v2.19.3`). Dependabot keeps these current.
+
+## Mandatory PR rules (security-critical)
+
+These rules are enforced by the CI and by review. PRs that violate them
+will not be merged, even on a "small typo" pretext.
+
+1. **Every change that touches a regex, a pattern array, an IOC list, or
+   the severity of a check must ship with a test in `tests/smoke.sh`** that
+   exercises the new behaviour against a fixture. If no deterministic
+   fixture is possible, the PR body must explain why and propose an
+   alternative validation. Without a test, the change is not reviewable.
+2. **No non-ASCII characters** in `check.sh`, `entrypoint.sh`, `action.yml`,
+   `Dockerfile`, or any workflow file. The `tests` workflow has a
+   Trojan-Source linter that fails CI on bidi / zero-width / BOM
+   characters. Justified non-ASCII (box-drawing in UI, accented identifiers
+   in comments) belongs in `README.md` / `docs/`, not in executable files.
+3. **PRs > 100 added LOC in `check.sh`** require a linked issue first that
+   discusses the architectural rationale. No surprise large refactors.
+4. **IOC additions must cite a public source** in a `# attribution: <url-or-repo>`
+   comment on or above the added line(s). IOCs received via email, DM, or
+   any out-of-band channel are not actioned — see `SECURITY.md` §
+   "Recognising follow-on social-engineering attempts".
+5. **No third-party repository "bundling"** — porting an individual IOC
+   with attribution is fine; copying a script wholesale is not.
+6. **No new runtime dependencies** for the bash script. The Docker image's
+   `apk add` line is also part of the supply chain — additions need
+   justification + a SHA-pinned base image bump.
 
 ## Commit messages
 

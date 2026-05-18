@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-05-18
+
+### Added
+- **`check.sh --verify-self`** — the script now fetches its own SHA-256
+  manifest from the matching GitHub Release and compares it against the
+  hash of the local copy. Exits 0 on match, 4 on mismatch, 5 on
+  network/parse error. Lets users verify the script hasn't been tampered
+  with locally without having to re-download.
+- **Sigstore keyless signing** of `check.sh` and `check.sh.sha256` on
+  every release. Each release ships an additional `.sigstore.json`
+  bundle that anyone can verify with
+  `cosign verify-blob --bundle … --certificate-identity-regexp 'https://github.com/.../\.github/workflows/release\.yml@.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com`.
+  Bound to this workflow path via OIDC; no key management on either side.
+- **Trojan-Source linter** in the `tests` workflow. Refuses to land
+  bidi-override / zero-width / BOM characters in `check.sh`, `entrypoint.sh`,
+  `action.yml`, `Dockerfile`, `tests/smoke.sh`, or any `.github/workflows/*.yml`.
+  Defends against CVE-2021-42574-style invisible-malware PRs.
+- **Structured issue templates** under `.github/ISSUE_TEMPLATE/`: bug
+  reports require version + entrypoint + reproducer + confirmations; new
+  IOC requests require a public source URL + false-positive-risk
+  assessment. Blank issues disabled.
+- **PR template** with a mandatory security checklist (no new runtime
+  deps, every regex change tested, no non-ASCII in security-critical
+  files, pinned SHAs, attribution for new IOCs).
+- **`docs/THREAT-MODEL.md`** — public threat model with attacker profiles,
+  vector × control matrix, trust-boundary statement, and end-to-end
+  verification recipe for outside auditors.
+
+### Changed
+- `CONTRIBUTING.md` codifies six mandatory PR rules (test required for
+  regex/IOC changes, no non-ASCII, ≤100 LOC for `check.sh` changes
+  without a prior issue, public attribution for IOCs, no third-party
+  bundling, no new runtime deps).
+- `dependabot.yml`: `open-pull-requests-limit` lowered from 5 to 3 to
+  reduce review-fatigue risk on Dependabot PRs (the load-bearing
+  defence against tag-rewrite attacks upstream).
+
 ## [1.1.2] — 2026-05-18
 
 ### Added
@@ -106,7 +143,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checkout, `step-security/harden-runner` as the first step, OpenSSF
   Scorecard analysis weekly, Dependabot for github-actions and Docker pins.
 
-[Unreleased]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.0.0...v1.1.0
