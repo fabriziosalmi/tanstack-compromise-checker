@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check.sh — TanStack npm supply chain attack checker (v1.1.1)
+# check.sh — TanStack npm supply chain attack checker (v1.1.2)
 # CVE-2026-45321 / GHSA-g7cv-rxg3-hmpx
 # https://github.com/fabriziosalmi/tanstack-compromise-checker
 #
@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-VERSION="1.1.1"
+VERSION="1.1.2"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 SCAN_DIR="${HOME}"
@@ -148,7 +148,9 @@ KNOWN_BAD_VERSIONS=(
   "@tanstack/router-generator@1.169.5" "@tanstack/router-generator@1.169.8"
   "@tanstack/start@1.169.5" "@tanstack/start@1.169.8"
   "@tanstack/react-start@1.169.5" "@tanstack/react-start@1.169.8"
+  "@tanstack/react-start@1.167.68" "@tanstack/react-start@1.167.71"
   "@tanstack/solid-start@1.169.5" "@tanstack/solid-start@1.169.8"
+  "@tanstack/router-plugin@1.167.38" "@tanstack/router-plugin@1.167.41"
   # Worm-propagated secondary victims (Mini Shai-Hulud).
   "@mistralai/mistralai@2.2.3" "@mistralai/mistralai@2.2.4"
   "@mistralai/mistralai-azure@1.7.2" "@mistralai/mistralai-azure@1.7.3"
@@ -174,20 +176,38 @@ SECONDARY_VICTIM_FAMILIES=(
 )
 
 # Known C2 / exfiltration endpoints used by the payload.
-C2_DOMAINS_RE='api\.masscan\.cloud|git-tanstack\.com|getsession\.org|litter\.catbox\.moe'
+# IP literal 83.142.209.194 added — attribution: cross-checked with
+# nkopylov/tanscript-exploit-check.
+C2_DOMAINS_RE='api\.masscan\.cloud|git-tanstack\.com|getsession\.org|litter\.catbox\.moe|83\.142\.209\.194'
 
-# Files dropped on disk by the payload.
-PAYLOAD_FILES=("router_init.js" "tanstack_runner.js" "router_runtime.js")
+# Files dropped on disk by the payload. opensearch_init.js + vite_setup.mjs
+# added — attribution: cross-checked with nkopylov/tanscript-exploit-check.
+PAYLOAD_FILES=("router_init.js" "tanstack_runner.js" "router_runtime.js" "opensearch_init.js" "vite_setup.mjs")
+
+# Known SHA-256 hashes of payload files seen in the wild. A hash match is a
+# stronger signal than a filename match (attackers may rename files).
+# Source: nkopylov/tanscript-exploit-check.
+KNOWN_PAYLOAD_HASHES=(
+  "ab4fcadaec49c03278063dd269ea5eef82d24f2124a8e15d7b90f2fa8601266c"
+  "2ec78d556d696e208927cc503d48e4b5eb56b31abc2870c2ed2e98d6be27fc96"
+  "2258284d65f63829bd67eaba01ef6f1ada2f593f9bbe41678b2df360bd90d3df"
+)
+
+# Specific malicious commit SHA referenced in compromised package.json files.
+# Source: nkopylov/tanscript-exploit-check.
+MALICIOUS_COMMIT_SHA="79ac49eedf774dd4b0cfa308722bc463cfe5885c"
 
 # Attacker commit author identity seen in the wild.
 ATTACKER_AUTHOR="claude@users.noreply.github.com"
 
 # Suspicious branch patterns. The 'dependabout' typo is the actual attacker
-# fingerprint, not the legitimate 'dependabot'.
+# fingerprint, not the legitimate 'dependabot'. Dune-themed words used by the
+# Mini Shai-Hulud campaign in `dependabot/github_actions/format/<dune-word>`
+# branches — attribution: cross-checked with nkopylov/tanscript-exploit-check.
 SUSPICIOUS_BRANCH_PATTERNS=(
-  "dependabot/github_actions/format/"
   "dependabout/"
 )
+DUNE_BRANCH_RE='dependabot/github_actions/format/(atreides|cogitor|fedaykin|fremen|futar|gesserit|ghola|harkonnen|heighliner|kanly|kralizec|lasgun|melange|mentat|ornithopter|sandworm|sardaukar|sayyadina|sietch|stillsuit|thumper|tleilaxu)'
 
 # Ransom token marker left by the attacker in npm token descriptions.
 RANSOM_TOKEN_RE="IfYouRevokeThisTokenItWillWipeTheComputerOfTheOwner"
@@ -920,6 +940,14 @@ while IFS= read -r wf; do
     add_finding "actions" "info" "actions/cache usage" "$wf"
     WF_FOUND=true
   fi
+  # Mini Shai-Hulud signature: a codeql_analysis.yml workflow that exfiltrates
+  # the entire secrets context via toJSON(secrets). Attribution: cross-checked
+  # with nkopylov/tanscript-exploit-check.
+  if [[ "$(basename "$wf")" == "codeql_analysis.yml" ]] && grep -q 'toJSON(secrets)' "$wf" 2>/dev/null; then
+    fail "Mini Shai-Hulud workflow exfiltrates the secrets context: ${BLD}$wf${RST}"
+    add_finding "actions" "fail" "codeql_analysis.yml uses toJSON(secrets) — Mini Shai-Hulud" "$wf"
+    WF_FOUND=true
+  fi
 done < <(find "$SCAN_DIR" -path '*/.github/workflows/*' -type f \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null || true)
 
 $WF_FOUND || ok "No risky GitHub Actions patterns detected (in scanned scope)"
@@ -946,18 +974,37 @@ done
 unset 'PAYLOAD_FIND_EXPR[${#PAYLOAD_FIND_EXPR[@]}-1]'   # drop trailing -o
 while IFS= read -r payload; do
   [[ -z "$payload" ]] && continue
-  ch8_fail "Payload file in node_modules: ${BLD}$payload${RST}"
-  add_finding "payload-file" "fail" "Mini Shai-Hulud payload file in node_modules" "$payload"
+  # Compute SHA-256 to confirm known-bad hash if we have a hasher available.
+  hash=""
+  if has shasum; then
+    hash="$(shasum -a 256 "$payload" 2>/dev/null | awk '{print $1}')"
+  elif has sha256sum; then
+    hash="$(sha256sum "$payload" 2>/dev/null | awk '{print $1}')"
+  fi
+  hash_match=""
+  for kh in "${KNOWN_PAYLOAD_HASHES[@]}"; do
+    if [[ -n "$hash" && "$hash" == "$kh" ]]; then
+      hash_match=" (SHA-256 matches known-bad: $kh)"
+      break
+    fi
+  done
+  ch8_fail "Payload file in node_modules: ${BLD}$payload${RST}$hash_match"
+  add_finding "payload-file" "fail" "Mini Shai-Hulud payload file in node_modules${hash_match}" "$payload"
 done < <(find "$SCAN_DIR" \
     \( -path '*/tests/fixtures/*' -o -path '*/__tests__/*' -o -path '*/__fixtures__/*' \) -prune \
     -o -path '*/node_modules/*' -type f \( "${PAYLOAD_FIND_EXPR[@]}" \) -print 2>/dev/null || true)
 
-# 8b — @tanstack/setup as optionalDependency (primary infection vector)
+# 8b — @tanstack/setup as optionalDependency (primary infection vector) +
+# malicious commit SHA referenced in any package.json.
 while IFS= read -r pkgjson; do
   [[ -z "$pkgjson" ]] && continue
   if grep -q '"@tanstack/setup"' "$pkgjson" 2>/dev/null; then
     ch8_fail "@tanstack/setup optionalDependency referenced in: ${BLD}$pkgjson${RST}"
     add_finding "infection-vector" "fail" "@tanstack/setup optionalDependency" "$pkgjson"
+  fi
+  if grep -q "$MALICIOUS_COMMIT_SHA" "$pkgjson" 2>/dev/null; then
+    ch8_fail "Known malicious commit SHA referenced in: ${BLD}$pkgjson${RST} ($MALICIOUS_COMMIT_SHA)"
+    add_finding "malicious-commit-sha" "fail" "Known malicious commit SHA in package.json" "$pkgjson"
   fi
 done < <(find "$SCAN_DIR" -path '*/node_modules/*' -name package.json -type f 2>/dev/null || true)
 
@@ -1031,7 +1078,7 @@ if has git; then
       ch8_fail "Git history contains commits by $ATTACKER_AUTHOR in ${BLD}$repo${RST}"
       add_finding "git-author" "fail" "Commit by attacker author $ATTACKER_AUTHOR" "$repo"
     fi
-    # Branch patterns
+    # Branch patterns (literal substring match for the dependabout typo).
     branches=$(git -C "$repo" for-each-ref --format='%(refname:short)' refs/heads refs/remotes 2>/dev/null || true)
     for pat in "${SUSPICIOUS_BRANCH_PATTERNS[@]}"; do
       if echo "$branches" | grep -q -- "$pat"; then
@@ -1039,6 +1086,12 @@ if has git; then
         add_finding "git-branch" "fail" "Suspicious branch pattern: $pat" "$repo"
       fi
     done
+    # Dune-themed attacker branch names under dependabot/github_actions/format/*.
+    if echo "$branches" | grep -qE "$DUNE_BRANCH_RE"; then
+      hits=$(echo "$branches" | grep -E "$DUNE_BRANCH_RE" | head -3 | tr '\n' ',' | sed 's/,$//')
+      ch8_fail "Dune-themed attacker branch in ${BLD}$repo${RST}: $hits"
+      add_finding "git-branch-dune" "fail" "Dune-themed Mini Shai-Hulud branch ($hits)" "$repo"
+    fi
   done < <(find "$SCAN_DIR" -name .git -type d -prune 2>/dev/null || true)
 fi
 
@@ -1051,8 +1104,8 @@ if has npm; then
 fi
 
 # 8h — Active payload processes
-if pgrep -f 'router_init\.js|tanstack_runner\.js|router_runtime\.js' >/dev/null 2>&1; then
-  ch8_fail "Active payload process detected (router_init / tanstack_runner / router_runtime)"
+if pgrep -f 'router_init\.js|tanstack_runner\.js|router_runtime\.js|opensearch_init' >/dev/null 2>&1; then
+  ch8_fail "Active payload process detected (router_init / tanstack_runner / router_runtime / opensearch_init)"
   add_finding "payload-process" "fail" "Active Mini Shai-Hulud payload process" ""
 fi
 

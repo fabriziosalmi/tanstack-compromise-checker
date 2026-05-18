@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] — 2026-05-18
+
+### Added
+- Additional Mini Shai-Hulud IOCs cross-checked with
+  [`nkopylov/tanscript-exploit-check`](https://github.com/nkopylov/tanscript-exploit-check):
+  - 3 known payload SHA-256 hashes — computed when a payload-shaped file is
+    found in `node_modules` and reported alongside the filename match.
+  - `opensearch_init.js` and `vite_setup.mjs` added to `PAYLOAD_FILES`.
+  - `opensearch_init` added to the active-payload-process pgrep regex.
+  - Known malicious commit SHA `79ac49ee…cfe5885c` flagged when referenced
+    in any `package.json` under `node_modules`.
+  - C2 IP literal `83.142.209.194` added to `C2_DOMAINS_RE`.
+  - Dune-themed Mini Shai-Hulud branch pattern (`dependabot/github_actions/format/<atreides|fremen|harkonnen|…>`) — 22 codewords.
+  - Additional pinned bad versions: `@tanstack/react-start@1.167.68`,
+    `@1.167.71`, `@tanstack/router-plugin@1.167.38`, `@1.167.41`.
+  - GitHub Actions Check 7 now flags `codeql_analysis.yml` workflows that
+    contain `toJSON(secrets)` — the signature exfiltration pattern.
+- `SECURITY.md`: new section "Recognising follow-on social-engineering
+  attempts" documenting a phishing pattern observed against detector authors
+  in this niche.
+
 ## [1.1.1] — 2026-05-16
 
 ### Fixed
@@ -85,7 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checkout, `step-security/harden-runner` as the first step, OpenSSF
   Scorecard analysis weekly, Dependabot for github-actions and Docker pins.
 
-[Unreleased]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/fabriziosalmi/tanstack-compromise-checker/releases/tag/v1.0.0

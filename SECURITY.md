@@ -66,6 +66,42 @@ IMAGE=ghcr.io/fabriziosalmi/tanstack-compromise-checker:$TAG
 gh attestation verify oci://$IMAGE --repo fabriziosalmi/tanstack-compromise-checker
 ```
 
+## Recognising follow-on social-engineering attempts
+
+Authors of detection tools for active campaigns are themselves a high-value
+target — once compromised, their tool can be used to distribute payloads to
+the defenders who trust them. The pattern observed on 2026-05-18 against this
+project, documented here so other defenders can recognise it:
+
+- **Email from a personal Gmail / Outlook address**, not an organisational
+  one, claiming to represent an unspecified "Security Team" or "internal
+  scanning tools".
+- **Recommends a third-party repository** ("we are sharing our local scan
+  parameters") that has either a typosquat name (e.g. *tanscript* vs
+  *tanstack*) or is unrelated to the sender's identity.
+- **Suggests integration / bundling** of that repository's logic into the
+  recipient's project, often framed as helping the upstream postmortem.
+- Sent within hours or days of a public release of the recipient's tool.
+- The cited repository may itself be benign at the time of writing —
+  the trust is the asset, not the current code.
+
+The correct response is the same regardless of intent:
+
+1. Do not clone, do not pipe, do not integrate the recommended code based
+   on the email.
+2. Do not reply — a reply confirms the address is monitored.
+3. If you want to evaluate the referenced repository on its merits, read it
+   passively (web UI or `gh api … --jq .content | base64 -d`), never on a
+   developer machine with execution privileges.
+4. Flag the email as phishing in your provider. Notify the repository owner
+   you were directed to — they may be a co-victim, not the attacker.
+
+This project's collaboration boundary is: incoming security input via
+[GitHub private advisory](https://github.com/fabriziosalmi/tanstack-compromise-checker/security/advisories/new),
+PRs against the public repo, or the [Discussions](https://github.com/fabriziosalmi/tanstack-compromise-checker/discussions)
+tab. Out-of-band recommendations to install or integrate something are
+never acted on.
+
 ## Do not pipe `curl | bash`
 
 Including for this tool. The very attack class this script detects
