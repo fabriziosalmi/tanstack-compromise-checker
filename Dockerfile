@@ -4,7 +4,7 @@
 # runtime cannot be silently re-pointed by an upstream tag move. To bump:
 #   docker buildx imagetools inspect alpine:3.20 | grep Digest
 # and update both the tag and the @sha256:... pin together.
-FROM alpine:3.20.10@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+FROM alpine:3.24.0@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
 
 RUN apk add --no-cache \
       bash \
