@@ -25,10 +25,21 @@ FAIL=0
 failed_count() {
   local out="$1"
   if command -v jq >/dev/null 2>&1; then
-    jq -r '.summary.failed // 0' <<<"$out"
+    local val
+    val="$(jq -r '.summary.failed // 0' <<<"$out" 2>/dev/null)"
+    if [[ "$val" =~ ^[0-9]+$ ]]; then
+      echo "$val"
+    else
+      echo "0"
+    fi
   else
-    grep -oE '"failed"[[:space:]]*:[[:space:]]*[0-9]+' <<<"$out" \
-      | head -1 | grep -oE '[0-9]+'
+    local match
+    match="$(grep -oE '"failed"[[:space:]]*:[[:space:]]*[0-9]+' <<<"$out" 2>/dev/null | head -1)"
+    if [[ -n "$match" ]]; then
+      echo "$match" | grep -oE '[0-9]+'
+    else
+      echo "0"
+    fi
   fi
 }
 
