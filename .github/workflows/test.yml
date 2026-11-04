@@ -33,7 +33,7 @@ jobs:
         # --severity=warning so info-level findings (SC2094 false positives in
         # the lockfile read loops, SC2329 on guarded helpers) don't fail CI.
         # Bump to 'info' once the loop-read patterns are refactored.
-        run: shellcheck --severity=warning -x check.sh entrypoint.sh tests/smoke.sh
+        run: shellcheck --severity=warning -x check.sh entrypoint.sh tests/smoke.sh tests/docker-run.sh
 
   trojan-source:
     # Trojan-Source attack vector defence (CVE-2021-42574): refuse to land
@@ -65,7 +65,7 @@ jobs:
           #   U+200B..U+200F  zero-width + LRM/RLM
           #   U+FEFF          BOM
           BIDI_RE='[\x{202A}-\x{202E}\x{2066}-\x{2069}\x{200B}-\x{200F}\x{FEFF}]'
-          FILES="check.sh entrypoint.sh action.yml Dockerfile tests/smoke.sh"
+          FILES="check.sh entrypoint.sh action.yml Dockerfile tests/smoke.sh tests/docker-run.sh"
           # Add every workflow file too.
           for wf in .github/workflows/*.yml .github/workflows/*.yaml; do
             [[ -f "$wf" ]] && FILES="$FILES $wf"
@@ -101,3 +101,24 @@ jobs:
 
       - name: Run smoke tests
         run: bash tests/smoke.sh
+
+  docker-run:
+    # Build the image and run it the way the README documents it: plain
+    # `docker run` with a bind mount, outside the Actions container runtime,
+    # so GITHUB_WORKSPACE is not set inside the container.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run documented docker run against the fixtures
+        run: bash tests/docker-run.sh

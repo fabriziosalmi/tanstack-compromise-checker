@@ -12,7 +12,22 @@ JSON_OUTPUT="${4:-}"
 BAD_VERSIONS_FILE="${5:-}"
 GHSA_ID="${6:-GHSA-g7cv-rxg3-hmpx}"
 
-WORKSPACE="${GITHUB_WORKSPACE:-/github/workspace}"
+# Workspace: the directory relative paths (scan-dir, json-output,
+# bad-versions-file) are resolved against.
+#   - Inside GitHub Actions the runner sets GITHUB_WORKSPACE: use it as is.
+#   - Outside Actions (plain `docker run`, as documented in the README) it is
+#     unset: use /github/workspace if something is mounted there, otherwise
+#     the absolute scan dir (the bind mount, e.g. /scan), otherwise the
+#     current directory (`docker run -w`).
+if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
+  WORKSPACE="$GITHUB_WORKSPACE"
+elif [[ -d /github/workspace ]]; then
+  WORKSPACE="/github/workspace"
+elif [[ "$SCAN_DIR" = /* && -d "$SCAN_DIR" ]]; then
+  WORKSPACE="$SCAN_DIR"
+else
+  WORKSPACE="$PWD"
+fi
 
 # Resolve scan dir relative to workspace
 if [[ "$SCAN_DIR" = /* ]]; then
@@ -50,11 +65,17 @@ if [[ -n "$JSON_OUTPUT" ]]; then
   else
     DEST="$WORKSPACE/$JSON_OUTPUT"
   fi
-  cp "$JSON_TMP" "$DEST"
-  # The Docker action runs as root; subsequent steps (e.g. actions/upload-artifact)
-  # run as the runner user and cannot read root-owned files in $GITHUB_WORKSPACE.
-  chmod 0644 "$DEST" 2>/dev/null || true
-  echo "::notice::Findings JSON written to $DEST"
+  if cp "$JSON_TMP" "$DEST"; then
+    # The Docker action runs as root; subsequent steps (e.g. actions/upload-artifact)
+    # run as the runner user and cannot read root-owned files in $GITHUB_WORKSPACE.
+    chmod 0644 "$DEST" 2>/dev/null || true
+    echo "::notice::Findings JSON written to $DEST"
+  else
+    # Do not claim a file that is not there. The usual cause outside Actions
+    # is a bind mount not writable by the image user (UID 1001): run with
+    # --user "$(id -u):$(id -g)" so the container writes as the mount owner.
+    echo "::error::Could not write findings JSON to $DEST (is the mounted directory writable by UID $(id -u)?)"
+  fi
 fi
 
 # Parse summary from JSON
