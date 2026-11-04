@@ -29,17 +29,26 @@ bash check.sh --online
 ### Docker — works on every OS that runs Docker (incl. Windows)
 
 ```sh
-docker run --rm -v "$PWD":/scan \
-  ghcr.io/fabriziosalmi/tanstack-compromise-checker:v1.0.0 \
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/scan \
+  ghcr.io/fabriziosalmi/tanstack-compromise-checker:1 \
   /scan true fail tanstack-findings.json '' GHSA-g7cv-rxg3-hmpx
 ```
+
+Exit code `0` means clean, `2` means indicators of compromise were found. The
+findings JSON is written to `tanstack-findings.json` in the current directory.
+`--user` lets the container write that file into a directory owned by your
+user; on Linux without it the scan still runs, but the JSON cannot be written.
+In PowerShell, where `id` does not exist, drop the `--user` flag.
+
+Image tags carry no `v` prefix: `1.2.0` for an exact release, `1` for the
+latest 1.x release (it moves with the `v1` Action tag), and `latest`.
 
 The image is multi-arch (`linux/amd64`, `linux/arm64`) and ships with build
 provenance signed via GitHub OIDC. Verify before running:
 
 ```sh
 gh attestation verify \
-  oci://ghcr.io/fabriziosalmi/tanstack-compromise-checker:v1.0.0 \
+  oci://ghcr.io/fabriziosalmi/tanstack-compromise-checker:1 \
   --repo fabriziosalmi/tanstack-compromise-checker
 ```
 
