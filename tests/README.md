@@ -15,6 +15,15 @@ exercise the two main outcomes:
 bash tests/smoke.sh
 ```
 
+`tests/docker-run.sh` builds the Docker image and runs it with the exact
+`docker run` command from the README against copies of the same fixtures
+(clean exit `0`, compromised exit `2`, findings JSON written to the mounted
+directory). It needs a working Docker daemon:
+
+```sh
+bash tests/docker-run.sh
+```
+
 ## Adding a test
 
 1. Create a new directory under `fixtures/` with a `package.json` (and an

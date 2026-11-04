@@ -110,8 +110,9 @@ cosign verify-blob \
   check.sh
 
 # 3. Verify the Docker image provenance (SLSA, signed by the same workflow).
+#    Image tags carry no "v" prefix, hence ${TAG#v}.
 gh attestation verify \
-  oci://ghcr.io/fabriziosalmi/tanstack-compromise-checker:$TAG \
+  oci://ghcr.io/fabriziosalmi/tanstack-compromise-checker:${TAG#v} \
   --repo fabriziosalmi/tanstack-compromise-checker
 
 # 4. Have the script verify itself once it is on your machine.

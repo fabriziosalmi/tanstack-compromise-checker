@@ -216,9 +216,9 @@ sha256sum -c check.sh.sha256
 ### How do I verify the Docker image?
 
 ```sh
-TAG=v1.0.0
+TAG=v1.2.0   # the release tag; the image tag is the same without the "v"
 gh attestation verify \
-  oci://ghcr.io/fabriziosalmi/tanstack-compromise-checker:$TAG \
+  oci://ghcr.io/fabriziosalmi/tanstack-compromise-checker:${TAG#v} \
   --repo fabriziosalmi/tanstack-compromise-checker
 ```
 

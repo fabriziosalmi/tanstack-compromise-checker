@@ -4,7 +4,7 @@
 #      verify the script before running it.
 #   2. A multi-arch Docker image on ghcr.io/<owner>/tanstack-compromise-checker
 #      tagged with the version and 'latest'. Lets non-bash users run the tool
-#      one-shot: docker run --rm -v "$PWD":/scan ghcr.io/.../checker --scan-dir /scan
+#      one-shot (image tags have no 'v' prefix, see the README Docker section).
 #   3. Build provenance attestations for the image (SLSA, verifiable with
 #      `gh attestation verify`).
 
@@ -135,7 +135,7 @@ jobs:
 
             ### Docker (works on macOS, Linux, Windows)
             ```sh
-            docker run --rm -v "$PWD":/scan ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }} /scan true fail tanstack-findings.json '' GHSA-g7cv-rxg3-hmpx
+            docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/scan ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }} /scan true fail tanstack-findings.json '' GHSA-g7cv-rxg3-hmpx
             ```
 
             ### GitHub Action
