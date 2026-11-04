@@ -94,7 +94,7 @@ Anyone — including an auditor with no prior relationship to this
 project — can verify the chain end-to-end:
 
 ```sh
-TAG=v1.2.0   # or whichever release you are checking
+TAG=v1.2.1   # or whichever release you are checking
 
 # 1. Fetch the script + its manifest from the GitHub Release.
 curl -fsSLO https://github.com/fabriziosalmi/tanstack-compromise-checker/releases/download/$TAG/check.sh

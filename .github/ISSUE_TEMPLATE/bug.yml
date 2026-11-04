@@ -14,7 +14,7 @@ body:
     attributes:
       label: Version
       description: Output of `bash check.sh --help | head -1` or the Docker image tag you used.
-      placeholder: "v1.2.0  /  ghcr.io/fabriziosalmi/tanstack-compromise-checker:1.2.0"
+      placeholder: "v1.2.1  /  ghcr.io/fabriziosalmi/tanstack-compromise-checker:1.2.1"
     validations:
       required: true
 
