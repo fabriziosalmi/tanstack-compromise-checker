@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-04
+
+### Fixed
+
+- `docker run` works outside GitHub Actions. With `GITHUB_WORKSPACE` unset the
+  entrypoint fell back to `/github/workspace`, which only exists in the Actions
+  runtime, and exited 3 on every project. The workspace is now
+  `/github/workspace` if present, else the absolute scan dir, else `$PWD` (#27).
+- A findings JSON that cannot be written into the mounted directory is reported
+  as an error instead of "Findings JSON written". On Linux run the image with
+  `--user "$(id -u):$(id -g)"` so it can write there (#27).
+- The docs pulled and verified `:v1.0.0`, a tag that does not exist: image tags
+  carry no `v` prefix (`1.2.1`, `1`, `latest`) (#27).
+- The failed-count parser no longer breaks when neither `jq` nor the `grep`
+  fallback can read the JSON (#10).
+
+### Added
+
+- `docker-run` CI job: builds the image and runs the README command on the clean
+  and compromised fixtures, asserting exit 0 and 2 and the JSON in the mount (#27).
+
+### Changed
+
+- Base image Alpine 3.24.3, and pinned GitHub Actions bumped by Dependabot.
+
 ## [1.2.0] — 2026-05-18
 
 ### Added
@@ -143,7 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checkout, `step-security/harden-runner` as the first step, OpenSSF
   Scorecard analysis weekly, Dependabot for github-actions and Docker pins.
 
-[Unreleased]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/fabriziosalmi/tanstack-compromise-checker/compare/v1.1.0...v1.1.1

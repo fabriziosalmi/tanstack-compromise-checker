@@ -40,7 +40,7 @@ findings JSON is written to `tanstack-findings.json` in the current directory.
 user; on Linux without it the scan still runs, but the JSON cannot be written.
 In PowerShell, where `id` does not exist, drop the `--user` flag.
 
-Image tags carry no `v` prefix: `1.2.0` for an exact release, `1` for the
+Image tags carry no `v` prefix: `1.2.1` for an exact release, `1` for the
 latest 1.x release (it moves with the `v1` Action tag), and `latest`.
 
 The image is multi-arch (`linux/amd64`, `linux/arm64`) and ships with build

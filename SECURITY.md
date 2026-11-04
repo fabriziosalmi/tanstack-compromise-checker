@@ -61,7 +61,7 @@ bash check.sh
 ## Verifying the Docker image
 
 ```sh
-TAG=v1.2.0   # the release tag; the image tag is the same without the "v"
+TAG=v1.2.1   # the release tag; the image tag is the same without the "v"
 IMAGE=ghcr.io/fabriziosalmi/tanstack-compromise-checker:${TAG#v}
 gh attestation verify oci://$IMAGE --repo fabriziosalmi/tanstack-compromise-checker
 ```

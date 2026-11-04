@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check.sh — TanStack npm supply chain attack checker (v1.2.0)
+# check.sh — TanStack npm supply chain attack checker (v1.2.1)
 # CVE-2026-45321 / GHSA-g7cv-rxg3-hmpx
 # https://github.com/fabriziosalmi/tanstack-compromise-checker
 #
@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-VERSION="1.2.0"
+VERSION="1.2.1"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 SCAN_DIR="${HOME}"
